@@ -1,4 +1,4 @@
-const BASE_URL = "https://otakuproxy.azizkalimorgo.workers.dev/".replace(/\/?$/, "/");
+const BASE_URL = "https://proxy.goibsmp.eu.org/".replace(/\/?$/, "/");
 const MIRRORS = (process.env.OTAKUDESU_MIRRORS || "")
   .split(",")
   .map((s) => s.trim().replace(/\/?$/, "/"))
