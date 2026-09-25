@@ -1,6 +1,6 @@
 const Axios = require("axios");
 const cheerio = require("cheerio");
-const { baseUrl } = require("./base-url");
+const { baseUrl, originBase } = require("./base-url");
 const { fetchEmbedMp4, isAllowed } = require("./embed-unpack");
 
 const USER_AGENT =
@@ -11,8 +11,8 @@ const MIRROR_ACTION = "2a3505c93b0035d3f455df82bf976b84";
 
 const ajaxHeaders = {
   "X-Requested-With": "XMLHttpRequest",
-  Referer: baseUrl,
-  Origin: baseUrl.replace(/\/$/, ""),
+  Referer: originBase,
+  Origin: originBase.replace(/\/$/, ""),
   Accept: "*/*",
   "Accept-Language": "id-ID,id;q=0.9,en;q=0.8",
   "User-Agent": USER_AGENT,
@@ -44,6 +44,7 @@ const get = async (url) => {
   let html = "";
 
   try {
+    // url is already a full proxy URL (e.g. https://otakuproxy…/episode/…)
     const jsonResponse = await Axios.get(jsonUrl(url), {
       headers: ajaxHeaders,
       timeout: 20000,
@@ -72,8 +73,8 @@ const get = async (url) => {
 
   if (!html) {
     try {
-      const response = await Axios.get(url, {
-        headers: { "User-Agent": USER_AGENT, Referer: baseUrl },
+      const response = await Axios.get(url, {          // url already proxied
+        headers: { "User-Agent": USER_AGENT, Referer: originBase },
         timeout: 20000,
       });
       html = typeof response.data === "string" ? response.data : "";
@@ -93,7 +94,7 @@ const get = async (url) => {
   if (nested) return nested;
 
   if (isAllowed(url)) {
-    const mp4s = await fetchEmbedMp4(url, baseUrl);
+    const mp4s = await fetchEmbedMp4(url, originBase);
     if (mp4s.length) return mp4s[0];
   }
 
@@ -103,6 +104,7 @@ const get = async (url) => {
 const resolveMirror = async (dataContent) => {
   const decoded = Buffer.from(dataContent, "base64").toString("utf8");
   const mirrorData = JSON.parse(decoded);
+  // ajax endpoint **must go through the proxy**
   const ajaxUrl = `${baseUrl}wp-admin/admin-ajax.php`;
 
   const nonceResponse = await Axios.post(

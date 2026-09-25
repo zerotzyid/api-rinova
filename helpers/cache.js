@@ -11,6 +11,8 @@ class Cache {
     return h.data;
   }
   set(k, data, ttl) {
+    // skip caching objects that only contain a warning / empty sources
+    if (data && data.warning && !data.sources?.length) return;
     if (this.map.size >= this.max) {
       const first = this.map.keys().next().value;
       this.map.delete(first);

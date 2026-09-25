@@ -5,19 +5,10 @@ const { getCookieString } = require("./cookie-jar");
 
 const pickUA = () => UA_LIST[Math.floor(Math.random() * UA_LIST.length)];
 
-const PROXY_ENDPOINTS = [
-  // allorigins
-  (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-  // thingproxy (returns raw HTML)
-  (url) => `https://thingproxy.freeboard.io/fetch/${encodeURIComponent(url)}`,
-  // r.jina.ai returns extracted text (fallback for text)
-  (url) => `https://r.jina.ai/http/${encodeURIComponent(url)}`,
-];
-
 async function buildHeaders() {
   const headers = {
     "User-Agent": pickUA(),
-    Referer: BASE_URL,
+    Referer: "https://otakudesu.blog/",
     "Accept-Language": "id-ID,id;q=0.9,en;q=0.8",
     Accept: "text/html,application/xhtml+xml",
   };
@@ -31,35 +22,27 @@ async function tryGetDirect(url) {
   const res = await Axios.get(url, {
     headers,
     timeout: TIMEOUT,
-    validateStatus: (s) => s === 200,
+    validateStatus: () => true,
+    responseType: "text",
+    maxRedirects: 5,
   });
+  if (res.status !== 200) {
+    const err = new Error(`upstream ${res.status}`);
+    err.status = res.status;
+    err.len = (res.data && res.data.length) || 0;
+    throw err;
+  }
   return typeof res.data === "string" ? res.data : "";
 }
 
-async function tryGetViaProxies(url) {
-  for (const buildProxyUrl of PROXY_ENDPOINTS) {
-    try {
-      const proxyUrl = buildProxyUrl(url);
-      const res = await Axios.get(proxyUrl, {
-        timeout: TIMEOUT,
-        validateStatus: (s) => s === 200,
-      });
-      const data = typeof res.data === "string" ? res.data : "";
-      if (data && data.length > 100) return data; // basic sanity
-    } catch (e) {
-      // try next proxy
-    }
-  }
-  throw new Error("all proxies failed");
-}
-
 async function tryGet(url) {
-  // Try direct first
+  // Try direct (which is already the proxy) with a single retry
   try {
     return await tryGetDirect(url);
   } catch (e) {
-    // fallback to proxies
-    return await tryGetViaProxies(url);
+    // one retry on network hiccup
+    await new Promise(r => setTimeout(r, 500));
+    return await tryGetDirect(url);
   }
 }
 
@@ -77,6 +60,7 @@ async function fetchHtml(pathOrUrl) {
       pageCache.set(key, html);
       return { html, url: u, cached: false };
     } catch (e) {
+      console.warn("[upstream] fetch failed", { path: u, status: e.status, len: e.len, msg: e.message });
       lastErr = e;
     }
   }

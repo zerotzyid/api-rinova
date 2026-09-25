@@ -1,6 +1,6 @@
 const cheerio = require("cheerio");
 const Axios = require("axios");
-const { baseUrl } = require("../helpers/base-url");
+const { baseUrl, originBase } = require("../helpers/base-url");
 const { BASE_URL } = require("../helpers/config");
 const { fetchHtml } = require("../helpers/upstream");
 const { pageCache } = require("../helpers/cache");
@@ -397,12 +397,34 @@ const VIDEOURL_RE = /(?:videoURL|source\s*=\s*|src\s*=\s*|file\s*=\s*)["']?(http
 
 const playerHeaders = {
   "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-  Referer: baseUrl,
+  Referer: originBase,
 };
 
+// helper: any non‑proxy URL (desustream, odcloud, archive, blogger, vidhide…) → fetch through proxy
+async function fetchViaProxy(targetUrl) {
+  const proxyUrl = `${BASE_URL}?url=${encodeURIComponent(targetUrl)}`;
+  const res = await Axios.get(proxyUrl, {
+    headers: { ...playerHeaders, Referer: targetUrl },
+    timeout: 20000,
+    validateStatus: () => true,
+    responseType: "text",
+    maxRedirects: 5,
+  });
+  if (res.status !== 200) {
+    const err = new Error(`proxy ${res.status}`);
+    err.status = res.status;
+    throw err;
+  }
+  return typeof res.data === "string" ? res.data : "";
+}
+
 async function fetchPlayerDirect(iframeUrl) {
-  const r = await Axios.get(iframeUrl, { headers: playerHeaders, timeout: 15000 });
-  const s = typeof r.data === "string" ? r.data : "";
+  // if the iframe is already a proxy URL (starts with BASE_URL) use it directly,
+  // otherwise go through the proxy with ?url=
+  const html = iframeUrl.startsWith(BASE_URL)
+    ? (await Axios.get(iframeUrl, { headers: playerHeaders, timeout: 20000, validateStatus: () => true, responseType: "text", maxRedirects: 5 })).data
+    : await fetchViaProxy(iframeUrl);
+  const s = typeof html === "string" ? html : "";
   const flat = s.replace(/\\\//g, "/");
   const odcloud = [...new Set(flat.match(ODCLOUD_RE) || [])];
   const archive = [...new Set(flat.match(ARCHIVE_RE) || [])];
@@ -416,12 +438,14 @@ async function fetchPlayerDirect(iframeUrl) {
   while ((m = FILE_RE.exec(flat)) !== null) files.push(m[1]);
   VIDEOURL_RE.lastIndex = 0;
   while ((m = VIDEOURL_RE.exec(flat)) !== null) files.push(m[1]);
-  if (/updesu/i.test(iframeUrl)) {
+  // desustream.net also offers ?mode=json – try it via proxy as well
+  if (/updesu|desustream/i.test(iframeUrl)) {
     try {
-      const sep = iframeUrl.includes("?") ? "&" : "?";
-      const j = await Axios.get(`${iframeUrl}${sep}mode=json&_=${Date.now()}`, {
+      const jsonUrl = `${iframeUrl}${iframeUrl.includes("?") ? "&" : "?"}mode=json&_=${Date.now()}`;
+      const j = await Axios.get(jsonUrl.startsWith(BASE_URL) ? jsonUrl : `${BASE_URL}?url=${encodeURIComponent(jsonUrl)}`, {
         headers: { ...playerHeaders, Referer: iframeUrl },
         timeout: 15000,
+        validateStatus: () => true,
       });
       const v = j && j.data && (j.data.video || j.data.url || j.data.file);
       if (v && typeof v === "string") {
@@ -548,8 +572,8 @@ exports.getAutoServerData = async function getAutoServerData(full) {
     const score = (c) => (/odcdn/i.test(c.iframe || "") ? 0 : /arcg/i.test(c.iframe || "") ? 1 : /updesu|desustream/i.test(c.iframe || "") ? 2 : 3);
     return score(a) - score(b);
   });
-  const checked = await mapLimit(candidates.slice(0, 12), 4, async (c) => {
-    if (!c.iframe || !/desustream\.net/i.test(c.iframe)) return { ...c, odcloud: [], archive: [], blogger: [], fallback: [], skipped: true };
+  const checked = await mapLimit(candidates.slice(0, 8), 3, async (c) => {
+    if (!c.iframe) return { ...c, odcloud: [], archive: [], blogger: [], fallback: [], skipped: true };
     try {
       const p = await fetchPlayerDirect(c.iframe);
       const blogger = p.blogger || [];
