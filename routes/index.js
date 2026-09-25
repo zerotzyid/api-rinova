@@ -30,5 +30,14 @@ router.post('/bv/*', BloggerController.asset)
 router.get('/youtube-extract', require('../api/youtube-extract'))
 router.get('/extract', require('../api/unified-extract'))
 
+router.get('/debug-proxy', async (req, res) => {
+  try {
+    const Axios = require('axios')
+    const r = await Axios.get('https://proxy.goibsmp.eu.org/__debug_ip', { timeout: 10000 })
+    res.json(r.data)
+  } catch (e) {
+    res.status(502).json({ error: e.message })
+  }
+})
 
 module.exports = router
