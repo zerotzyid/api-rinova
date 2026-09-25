@@ -43,7 +43,7 @@ router.get('/debug-proxy', async (req, res) => {
 router.get('/debug-upstream', async (req, res) => {
   try {
     const Axios = require('axios')
-    const r = await Axios.get('https://proxy.goibsmp.eu.org/rinova/episode/ynko-episode-2-sub-indo/', {
+    const r = await Axios.get('https://proxy.goibsmp.eu.org/episode/ynko-episode-2-sub-indo/', {
       timeout: 20000,
       validateStatus: () => true,
       maxRedirects: 5,
@@ -54,6 +54,7 @@ router.get('/debug-upstream', async (req, res) => {
       length: html.length,
       preview: html.slice(0, 200),
       upstreamStatusHeader: r.headers['x-upstream-status'] || null,
+      rinovaAuthedHeader: r.headers['x-rinova-authed'] || null,
     })
   } catch (e) {
     res.status(502).json({ error: e.message })
