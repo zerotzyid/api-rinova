@@ -1,16 +1,22 @@
 const Axios = require("axios");
-const { BASE_URL, MIRRORS, UA_LIST, TIMEOUT } = require("./config");
+const { PROXY_AUTH_URL, UA_LIST, TIMEOUT, RINOVA_PROXY_KEY } = require("./config");
 const { pageCache } = require("./cache");
 const { getCookieString } = require("./cookie-jar");
+
+// PROXY_AUTH_URL is already imported above
 
 const pickUA = () => UA_LIST[Math.floor(Math.random() * UA_LIST.length)];
 
 async function buildHeaders() {
+  if (!RINOVA_PROXY_KEY) {
+    throw new Error("RINOVA_PROXY_KEY environment variable is required");
+  }
   const headers = {
     "User-Agent": pickUA(),
     Referer: "https://otakudesu.blog/",
     "Accept-Language": "id-ID,id;q=0.9,en;q=0.8",
     Accept: "text/html,application/xhtml+xml",
+    "X-Rinova-Proxy-Key": RINOVA_PROXY_KEY,
   };
   const cookie = await getCookieString();
   if (cookie) headers.Cookie = cookie;
@@ -47,9 +53,10 @@ async function tryGet(url) {
 }
 
 async function fetchHtml(pathOrUrl) {
-  const bases = [BASE_URL, ...MIRRORS];
   const isFull = /^https?:\/\//i.test(pathOrUrl);
-  const paths = isFull ? [pathOrUrl] : bases.map((b) => b + String(pathOrUrl || "").replace(/^\/+/, ""));
+  const paths = isFull
+    ? [pathOrUrl]
+    : [PROXY_AUTH_URL + String(pathOrUrl || "").replace(/^\/+/, "")];
   const key = "html:" + (isFull ? pathOrUrl : paths[0]);
   const hit = pageCache.get(key);
   if (hit) return { html: hit, url: paths[0], cached: true };

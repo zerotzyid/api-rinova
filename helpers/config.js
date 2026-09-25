@@ -1,4 +1,5 @@
 const BASE_URL = "https://proxy.goibsmp.eu.org/".replace(/\/?$/, "/");
+const PROXY_AUTH_URL = (BASE_URL + "rinova/").replace(/\/+$/, "/") + "/";
 const MIRRORS = (process.env.OTAKUDESU_MIRRORS || "")
   .split(",")
   .map((s) => s.trim().replace(/\/?$/, "/"))
@@ -14,5 +15,6 @@ const TIMEOUT = parseInt(process.env.UPSTREAM_TIMEOUT_MS || "20000", 10);
 const CACHE_TTL_MS = parseInt(process.env.CACHE_TTL_MS || "300000", 10);
 const ANILIST_TTL_MS = 24 * 60 * 60 * 1000;
 const RATE_LIMIT_PER_MIN = parseInt(process.env.RATE_LIMIT_PER_MIN || "30", 10);
+const RINOVA_PROXY_KEY = process.env.RINOVA_PROXY_KEY || "";
 
-module.exports = { BASE_URL, MIRRORS, CREATOR, UA_LIST, TIMEOUT, CACHE_TTL_MS, ANILIST_TTL_MS, RATE_LIMIT_PER_MIN };
+module.exports = { BASE_URL, PROXY_AUTH_URL, MIRRORS, CREATOR, UA_LIST, TIMEOUT, CACHE_TTL_MS, ANILIST_TTL_MS, RATE_LIMIT_PER_MIN, RINOVA_PROXY_KEY };
