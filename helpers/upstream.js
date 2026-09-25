@@ -4,9 +4,17 @@ const { pageCache } = require("./cache");
 const { getCookieString } = require("./cookie-jar");
 
 const pickUA = () => UA_LIST[Math.floor(Math.random() * UA_LIST.length)];
-const PROXY_URL = "https://api.allorigins.win/raw?url=";
 
-async function tryGetDirect(url) {
+const PROXY_ENDPOINTS = [
+  // allorigins
+  (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+  // thingproxy (returns raw HTML)
+  (url) => `https://thingproxy.freeboard.io/fetch/${encodeURIComponent(url)}`,
+  // r.jina.ai returns extracted text (fallback for text)
+  (url) => `https://r.jina.ai/http/${encodeURIComponent(url)}`,
+];
+
+async function buildHeaders() {
   const headers = {
     "User-Agent": pickUA(),
     Referer: BASE_URL,
@@ -15,7 +23,11 @@ async function tryGetDirect(url) {
   };
   const cookie = await getCookieString();
   if (cookie) headers.Cookie = cookie;
+  return headers;
+}
 
+async function tryGetDirect(url) {
+  const headers = await buildHeaders();
   const res = await Axios.get(url, {
     headers,
     timeout: TIMEOUT,
@@ -24,13 +36,21 @@ async function tryGetDirect(url) {
   return typeof res.data === "string" ? res.data : "";
 }
 
-async function tryGetViaProxy(url) {
-  const proxyUrl = PROXY_URL + encodeURIComponent(url);
-  const res = await Axios.get(proxyUrl, {
-    timeout: TIMEOUT,
-    validateStatus: (s) => s === 200,
-  });
-  return typeof res.data === "string" ? res.data : "";
+async function tryGetViaProxies(url) {
+  for (const buildProxyUrl of PROXY_ENDPOINTS) {
+    try {
+      const proxyUrl = buildProxyUrl(url);
+      const res = await Axios.get(proxyUrl, {
+        timeout: TIMEOUT,
+        validateStatus: (s) => s === 200,
+      });
+      const data = typeof res.data === "string" ? res.data : "";
+      if (data && data.length > 100) return data; // basic sanity
+    } catch (e) {
+      // try next proxy
+    }
+  }
+  throw new Error("all proxies failed");
 }
 
 async function tryGet(url) {
@@ -38,12 +58,8 @@ async function tryGet(url) {
   try {
     return await tryGetDirect(url);
   } catch (e) {
-    // fallback to proxy
-    try {
-      return await tryGetViaProxy(url);
-    } catch (e2) {
-      throw e2;
-    }
+    // fallback to proxies
+    return await tryGetViaProxies(url);
   }
 }
 
