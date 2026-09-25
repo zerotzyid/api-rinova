@@ -3,15 +3,19 @@ const { BASE_URL, MIRRORS, UA_LIST, TIMEOUT } = require("./config");
 const { pageCache } = require("./cache");
 
 const pickUA = () => UA_LIST[Math.floor(Math.random() * UA_LIST.length)];
+const UPSTREAM_COOKIE = process.env.UPSTREAM_COOKIE || "";
 
 async function tryGet(url) {
+  const headers = {
+    "User-Agent": pickUA(),
+    Referer: BASE_URL,
+    "Accept-Language": "id-ID,id;q=0.9,en;q=0.8",
+    Accept: "text/html,application/xhtml+xml",
+  };
+  if (UPSTREAM_COOKIE) headers.Cookie = UPSTREAM_COOKIE;
+
   const res = await Axios.get(url, {
-    headers: {
-      "User-Agent": pickUA(),
-      Referer: BASE_URL,
-      "Accept-Language": "id-ID,id;q=0.9,en;q=0.8",
-      Accept: "text/html,application/xhtml+xml",
-    },
+    headers,
     timeout: TIMEOUT,
     validateStatus: (s) => s === 200,
   });
