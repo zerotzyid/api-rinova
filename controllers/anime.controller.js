@@ -448,7 +448,20 @@ async function mapLimit(arr, limit, fn) {
 }
 
 exports.getAutoServerData = async function getAutoServerData(full) {
-  const { html } = await fetchHtml(full);
+  let html;
+  let cached = false;
+  try {
+    const res = await fetchHtml(full);
+    html = res.html;
+  } catch (e) {
+    const cachedHtml = pageCache.get("html:" + full);
+    if (cachedHtml) {
+      html = cachedHtml;
+      cached = true;
+    } else {
+      throw e;
+    }
+  }
   const $ = cheerio.load(html);
   const title = n.cleanText($(".venutama > h1").first().text() || $(".posttl").first().text());
   if (!title) { const e = new Error("episode tidak ditemukan"); e.statusCode = 404; throw e; }
@@ -514,6 +527,7 @@ exports.getAutoServerData = async function getAutoServerData(full) {
     href: `/api/auto-server/${full.replace(/^episode\//, "")}`,
     playerUrl: `/player/${full.replace(/^episode\//, "")}`,
     otakudesuUrl: `${baseUrl}${full}`,
+    cached,
     defaultStreamingUrl: defaultIframe,
     odcloud,
     archive,
