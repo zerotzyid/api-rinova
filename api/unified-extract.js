@@ -1,4 +1,3 @@
-const { Innertube } = require('youtubei.js');
 const bg = require('../helpers/blogger');
 
 let youtubeClient = null;
@@ -8,6 +7,7 @@ async function getYoutubeClient() {
   if (youtubeClient) return youtubeClient;
   if (clientPromise) return clientPromise;
   clientPromise = (async () => {
+    const { Innertube } = await import('youtubei.js');
     youtubeClient = await Innertube.create({
       client_type: 'ANDROID',
       lang: 'en', location: 'US',
