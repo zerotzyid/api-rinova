@@ -70,15 +70,31 @@ module.exports = async (req, res) => {
     const data = await response.json();
     
     if (data.playabilityStatus?.status !== 'OK') {
-      return res.status(404).json({ 
-        error: 'Video tidak dapat diputar',
-        reason: data.playabilityStatus?.reason,
-        videoId
+      return res.json({ 
+        videoId,
+        title: data.videoDetails?.title,
+        author: data.videoDetails?.author,
+        duration: data.videoDetails?.lengthSeconds,
+        viewCount: data.videoDetails?.viewCount,
+        thumbnails: data.videoDetails?.thumbnails,
+        formats: { video: [], audio: [], combined: [] },
+        playabilityStatus: data.playabilityStatus,
+        warning: 'Video tidak dapat diputar: ' + (data.playabilityStatus?.reason || 'unknown')
       });
     }
     
     if (!data.streamingData) {
-      return res.status(404).json({ error: 'Tidak ada streaming data', videoId });
+      return res.json({
+        videoId,
+        title: data.videoDetails?.title,
+        author: data.videoDetails?.author,
+        duration: data.videoDetails?.lengthSeconds,
+        viewCount: data.videoDetails?.viewCount,
+        thumbnails: data.videoDetails?.thumbnails,
+        formats: { video: [], audio: [], combined: [] },
+        playabilityStatus: data.playabilityStatus,
+        warning: 'Tidak ada streaming data'
+      });
     }
     
     const formats = data.streamingData.formats || [];
