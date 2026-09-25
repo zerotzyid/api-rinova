@@ -4,8 +4,9 @@ const { pageCache } = require("./cache");
 const { getCookieString } = require("./cookie-jar");
 
 const pickUA = () => UA_LIST[Math.floor(Math.random() * UA_LIST.length)];
+const PROXY_URL = "https://api.allorigins.win/raw?url=";
 
-async function tryGet(url) {
+async function tryGetDirect(url) {
   const headers = {
     "User-Agent": pickUA(),
     Referer: BASE_URL,
@@ -21,6 +22,29 @@ async function tryGet(url) {
     validateStatus: (s) => s === 200,
   });
   return typeof res.data === "string" ? res.data : "";
+}
+
+async function tryGetViaProxy(url) {
+  const proxyUrl = PROXY_URL + encodeURIComponent(url);
+  const res = await Axios.get(proxyUrl, {
+    timeout: TIMEOUT,
+    validateStatus: (s) => s === 200,
+  });
+  return typeof res.data === "string" ? res.data : "";
+}
+
+async function tryGet(url) {
+  // Try direct first
+  try {
+    return await tryGetDirect(url);
+  } catch (e) {
+    // fallback to proxy
+    try {
+      return await tryGetViaProxy(url);
+    } catch (e2) {
+      throw e2;
+    }
+  }
 }
 
 async function fetchHtml(pathOrUrl) {
