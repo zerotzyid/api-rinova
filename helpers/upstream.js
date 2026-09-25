@@ -1,9 +1,9 @@
 const Axios = require("axios");
 const { BASE_URL, MIRRORS, UA_LIST, TIMEOUT } = require("./config");
 const { pageCache } = require("./cache");
+const { getCookieString } = require("./cookie-jar");
 
 const pickUA = () => UA_LIST[Math.floor(Math.random() * UA_LIST.length)];
-const UPSTREAM_COOKIE = process.env.UPSTREAM_COOKIE || "";
 
 async function tryGet(url) {
   const headers = {
@@ -12,7 +12,8 @@ async function tryGet(url) {
     "Accept-Language": "id-ID,id;q=0.9,en;q=0.8",
     Accept: "text/html,application/xhtml+xml",
   };
-  if (UPSTREAM_COOKIE) headers.Cookie = UPSTREAM_COOKIE;
+  const cookie = await getCookieString();
+  if (cookie) headers.Cookie = cookie;
 
   const res = await Axios.get(url, {
     headers,
