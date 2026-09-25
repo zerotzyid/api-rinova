@@ -29,9 +29,8 @@ async function extractYouTube(videoId) {
     body: JSON.stringify({ videoId, context: youtube.session.context })
   });
   const data = await res.json();
-  if (data.playabilityStatus?.status !== 'OK' || !data.streamingData) return null;
-  const fmts = data.streamingData.formats || [];
-  const adapts = data.streamingData.adaptiveFormats || [];
+  const fmts = data.streamingData?.formats || [];
+  const adapts = data.streamingData?.adaptiveFormats || [];
   return {
     source: 'youtube',
     videoId,
@@ -43,7 +42,9 @@ async function extractYouTube(videoId) {
       combined: fmts.filter(f=>f.url).map(formatFormat).sort((a,b)=>(b.height||0)-(a.height||0)),
       video: adapts.filter(f=>f.mimeType?.includes('video/')&&!f.mimeType?.includes('audio/')).map(formatFormat).sort((a,b)=>(b.height||0)-(a.height||0)),
       audio: adapts.filter(f=>f.mimeType?.includes('audio/')).map(formatFormat).sort((a,b)=>(b.bitrate||0)-(a.bitrate||0)),
-    }
+    },
+    playabilityStatus: data.playabilityStatus,
+    warning: data.playabilityStatus?.status !== 'OK' ? (data.playabilityStatus?.reason || 'Video tidak dapat diputar') : undefined
   };
 }
 

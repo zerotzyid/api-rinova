@@ -450,6 +450,7 @@ async function mapLimit(arr, limit, fn) {
 exports.getAutoServerData = async function getAutoServerData(full) {
   let html;
   let cached = false;
+  let warning = null;
   try {
     const res = await fetchHtml(full);
     html = res.html;
@@ -459,12 +460,49 @@ exports.getAutoServerData = async function getAutoServerData(full) {
       html = cachedHtml;
       cached = true;
     } else {
-      throw e;
+      // Return graceful empty response instead of 502
+      warning = 'Upstream tidak tersedia, tidak ada cache';
+      return {
+        title: '',
+        episodeId: full,
+        id: full,
+        href: `/api/auto-server/${full.replace(/^episode\//, "")}`,
+        playerUrl: `/player/${full.replace(/^episode\//, "")}`,
+        otakudesuUrl: `${baseUrl}${full}`,
+        defaultStreamingUrl: null,
+        odcloud: [],
+        archive: [],
+        fallback: [],
+        sources: [],
+        checked: 0,
+        totalMirror: 0,
+        cached: false,
+        warning
+      };
     }
   }
   const $ = cheerio.load(html);
   const title = n.cleanText($(".venutama > h1").first().text() || $(".posttl").first().text());
-  if (!title) { const e = new Error("episode tidak ditemukan"); e.statusCode = 404; throw e; }
+  if (!title) {
+    warning = 'Episode tidak ditemukan';
+    return {
+      title: '',
+      episodeId: full,
+      id: full,
+      href: `/api/auto-server/${full.replace(/^episode\//, "")}`,
+      playerUrl: `/player/${full.replace(/^episode\//, "")}`,
+      otakudesuUrl: `${baseUrl}${full}`,
+      defaultStreamingUrl: null,
+      odcloud: [],
+      archive: [],
+      fallback: [],
+      sources: [],
+      checked: 0,
+      totalMirror: 0,
+      cached,
+      warning
+    };
+  }
   const defaultIframe = $("#embed_holder iframe").attr("src") || $("#pembed iframe").attr("src") || null;
   const tokens = [];
   for (const q of ["720p", "480p", "360p"]) {
@@ -475,7 +513,26 @@ exports.getAutoServerData = async function getAutoServerData(full) {
       tokens.push({ quality: q, server: n.cleanText(a.text()), token });
     });
   }
-  if (!defaultIframe && !tokens.length) { const e = new Error("server tidak ditemukan"); e.statusCode = 404; throw e; }
+  if (!defaultIframe && !tokens.length) {
+    warning = 'Server tidak ditemukan';
+    return {
+      title,
+      episodeId: full,
+      id: full,
+      href: `/api/auto-server/${full.replace(/^episode\//, "")}`,
+      playerUrl: `/player/${full.replace(/^episode\//, "")}`,
+      otakudesuUrl: `${baseUrl}${full}`,
+      defaultStreamingUrl: null,
+      odcloud: [],
+      archive: [],
+      fallback: [],
+      sources: [],
+      checked: 0,
+      totalMirror: 0,
+      cached,
+      warning
+    };
+  }
   const resolved = await mapLimit(tokens, 5, async (t) => {
     try {
       const iframe = await episodeHelper.resolveMirror(t.token);
@@ -535,7 +592,7 @@ exports.getAutoServerData = async function getAutoServerData(full) {
     sources,
     checked: checked.length,
     totalMirror: tokens.length,
-    cached: false,
+    warning
   };
 }
 
@@ -548,7 +605,7 @@ exports.autoServer = async (req, res) => {
   if (hit) return R.ok(res, { ...hit, cached: true }, null);
   try {
     const data = await module.exports.getAutoServerData(full);
-    if (!data.odcloud.length && !data.archive.length && !data.fallback.length) return R.notFound(res, "odcloud/archive tidak ditemukan di episode ini");
+    // always return 200 with data (may be empty) so client can handle gracefully
     pageCache.set(cacheKey, data);
     return R.ok(res, data, null);
   } catch (e) {
