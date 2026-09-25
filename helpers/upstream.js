@@ -1,0 +1,41 @@
+const Axios = require("axios");
+const { BASE_URL, MIRRORS, UA_LIST, TIMEOUT } = require("./config");
+const { pageCache } = require("./cache");
+
+const pickUA = () => UA_LIST[Math.floor(Math.random() * UA_LIST.length)];
+
+async function tryGet(url) {
+  const res = await Axios.get(url, {
+    headers: {
+      "User-Agent": pickUA(),
+      Referer: BASE_URL,
+      "Accept-Language": "id-ID,id;q=0.9,en;q=0.8",
+      Accept: "text/html,application/xhtml+xml",
+    },
+    timeout: TIMEOUT,
+    validateStatus: (s) => s === 200,
+  });
+  return typeof res.data === "string" ? res.data : "";
+}
+
+async function fetchHtml(pathOrUrl) {
+  const bases = [BASE_URL, ...MIRRORS];
+  const isFull = /^https?:\/\//i.test(pathOrUrl);
+  const paths = isFull ? [pathOrUrl] : bases.map((b) => b + String(pathOrUrl || "").replace(/^\/+/, ""));
+  const key = "html:" + (isFull ? pathOrUrl : paths[0]);
+  const hit = pageCache.get(key);
+  if (hit) return { html: hit, url: paths[0], cached: true };
+  let lastErr = null;
+  for (const u of paths) {
+    try {
+      const html = await tryGet(u);
+      pageCache.set(key, html);
+      return { html, url: u, cached: false };
+    } catch (e) {
+      lastErr = e;
+    }
+  }
+  throw lastErr || new Error("upstream tidak tersedia");
+}
+
+module.exports = { fetchHtml, tryGet };
