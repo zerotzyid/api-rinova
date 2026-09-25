@@ -43,10 +43,15 @@ router.get('/debug-proxy', async (req, res) => {
 router.get('/debug-upstream', async (req, res) => {
   try {
     const Axios = require('axios')
+    const PROXY_KEY = 'f141061f471140e6ab5ff92ca76bd822ce2463cd4f384f3eb9f7b123c1b684d4';
     const r = await Axios.get('https://proxy.goibsmp.eu.org/episode/ynko-episode-2-sub-indo/', {
       timeout: 20000,
       validateStatus: () => true,
       maxRedirects: 5,
+      headers: {
+        'X-Rinova-Proxy-Key': PROXY_KEY,
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+      }
     })
     const html = typeof r.data === 'string' ? r.data : ''
     res.json({
